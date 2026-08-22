@@ -7,9 +7,8 @@ from geopy.geocoders import Nominatim
 import os
 
 # -------------------------------------------------------------
-# 1. 페이지 환경 설정 (배경 제거 로고 연동)
+# 1. 페이지 환경 설정 (투명 로고 우선 적용)
 # -------------------------------------------------------------
-# 배경 제거된 로고 파일 우선 확인, 없으면 logo.png 확인
 if os.path.exists("logo-removebg-preview.png"):
     logo_file = "logo-removebg-preview.png"
 elif os.path.exists("logo.png"):
@@ -99,7 +98,7 @@ if "safety_log" not in st.session_state:
     st.session_state.safety_log = []
 
 # -------------------------------------------------------------
-# 4. 규칙 기반 위험도 알고리즘 (가변 계산)
+# 4. 규칙 기반 위험도 알고리즘 (가변 계산식 적용)
 # -------------------------------------------------------------
 def calculate_heat_risk(user_type, out_time_hour, duration_min, temp=35, humidity=75):
     base_score = 20
@@ -136,7 +135,7 @@ def calculate_heat_risk(user_type, out_time_hour, duration_min, temp=35, humidit
     return total_score, level
 
 # -------------------------------------------------------------
-# 5. 사이드바 (투명 로고 적용)
+# 5. 사이드바 (투명 로고 연동)
 # -------------------------------------------------------------
 with st.sidebar:
     if logo_file:
@@ -267,29 +266,29 @@ if app_mode == "사용자: 외출 도우미":
 """
             st.markdown(ai_plan)
 
-   st.markdown("---")
-st.subheader("🛡️ 외출 상태 실시간 전송")
-c1, c2, c3 = st.columns(3)
-
-# [핵심 수정] 서버 시간(UTC)에 9시간을 더해 한국 표준시(KST)로 변환
-kst_now = datetime.datetime.utcnow() + datetime.timedelta(hours=9)
-now_str = kst_now.strftime('%H:%M')
-
-with c1:
-    if st.button("🚶 외출 시작 알림"):
-        st.session_state.safety_status = f"외출 중 ({st.session_state.out_time.strftime('%H:%M')} 출발)"
-        st.session_state.safety_log.append(f"[{now_str}] '{st.session_state.location_input}'에서 외출 시작")
-        st.success("보호자 대시보드에 [외출 시작]이 기록되었습니다.")
-with c2:
-    if st.button("🏠 무더위쉼터 도착"):
-        st.session_state.safety_status = f"쉼터 휴식 중 ({target_shelter['name']})"
-        st.session_state.safety_log.append(f"[{now_str}] '{target_shelter['name']}' 도착 및 휴식 중")
-        st.info("보호자에게 [쉼터 도착] 알림이 전달되었습니다.")
-with c3:
-    if st.button("✅ 안전 귀가 완료"):
-        st.session_state.safety_status = "귀가 완료 (안전)"
-        st.session_state.safety_log.append(f"[{now_str}] '{st.session_state.location_input}' 자택으로 귀가 완료")
-        st.success("보호자에게 [귀가 완료] 확인이 전달되었습니다.")
+    st.markdown("---")
+    st.subheader("🛡️ 외출 상태 실시간 전송")
+    c1, c2, c3 = st.columns(3)
+    
+    # 한국 표준시(KST, UTC+9)로 시간 보정
+    kst_now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
+    now_str = kst_now.strftime('%H:%M')
+    
+    with c1:
+        if st.button("🚶 외출 시작 알림"):
+            st.session_state.safety_status = f"외출 중 ({st.session_state.out_time.strftime('%H:%M')} 출발)"
+            st.session_state.safety_log.append(f"[{now_str}] '{st.session_state.location_input}'에서 외출 시작")
+            st.success("보호자 대시보드에 [외출 시작]이 기록되었습니다.")
+    with c2:
+        if st.button("🏠 무더위쉼터 도착"):
+            st.session_state.safety_status = f"쉼터 휴식 중 ({target_shelter['name']})"
+            st.session_state.safety_log.append(f"[{now_str}] '{target_shelter['name']}' 도착 및 휴식 중")
+            st.info("보호자에게 [쉼터 도착] 알림이 전달되었습니다.")
+    with c3:
+        if st.button("✅ 안전 귀가 완료"):
+            st.session_state.safety_status = "귀가 완료 (안전)"
+            st.session_state.safety_log.append(f"[{now_str}] '{st.session_state.location_input}' 자택으로 귀가 완료")
+            st.success("보호자에게 [귀가 완료] 확인이 전달되었습니다.")
 
 # -------------------------------------------------------------
 # 7. 보호자 화면: 실시간 안부 대시보드
