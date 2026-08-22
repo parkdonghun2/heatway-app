@@ -7,10 +7,17 @@ from geopy.geocoders import Nominatim
 import os
 
 # -------------------------------------------------------------
-# 1. 페이지 환경 설정 (브라우저 탭 아이콘에도 로고 적용)
+# 1. 페이지 환경 설정 (배경 제거 로고 연동)
 # -------------------------------------------------------------
-logo_path = "logo.png"
-page_icon_img = logo_path if os.path.exists(logo_path) else "☀️"
+# 배경 제거된 로고 파일 우선 확인, 없으면 logo.png 확인
+if os.path.exists("logo-removebg-preview.png"):
+    logo_file = "logo-removebg-preview.png"
+elif os.path.exists("logo.png"):
+    logo_file = "logo.png"
+else:
+    logo_file = None
+
+page_icon_img = logo_file if logo_file else "☀️"
 
 st.set_page_config(
     page_title="HEATWAY - 전국 폭염 취약계층 안전 도우미",
@@ -92,7 +99,7 @@ if "safety_log" not in st.session_state:
     st.session_state.safety_log = []
 
 # -------------------------------------------------------------
-# 4. 규칙 기반 위험도 알고리즘
+# 4. 규칙 기반 위험도 알고리즘 (가변 계산)
 # -------------------------------------------------------------
 def calculate_heat_risk(user_type, out_time_hour, duration_min, temp=35, humidity=75):
     base_score = 20
@@ -129,11 +136,11 @@ def calculate_heat_risk(user_type, out_time_hour, duration_min, temp=35, humidit
     return total_score, level
 
 # -------------------------------------------------------------
-# 5. 사이드바 (로고 이미지 추가)
+# 5. 사이드바 (투명 로고 적용)
 # -------------------------------------------------------------
 with st.sidebar:
-    if os.path.exists("logo.png"):
-        st.image("logo.png", width=120)
+    if logo_file:
+        st.image(logo_file, width=120)
     st.title("더위쉼표 (HEATWAY)")
     app_mode = st.radio("모드 선택", ["사용자: 외출 도우미", "보호자: 실시간 안부 대시보드"])
 
@@ -143,8 +150,8 @@ with st.sidebar:
 if app_mode == "사용자: 외출 도우미":
     head_c1, head_c2 = st.columns([1, 8])
     with head_c1:
-        if os.path.exists("logo.png"):
-            st.image("logo.png", width=75)
+        if logo_file:
+            st.image(logo_file, width=75)
     with head_c2:
         st.title("더위쉼표 맞춤 외출 플래너")
         st.caption("폭염 취약계층을 위한 실시간 위치기반 외출 안전 가이드")
@@ -287,8 +294,8 @@ if app_mode == "사용자: 외출 도우미":
 else:
     head_c1, head_c2 = st.columns([1, 8])
     with head_c1:
-        if os.path.exists("logo.png"):
-            st.image("logo.png", width=75)
+        if logo_file:
+            st.image(logo_file, width=75)
     with head_c2:
         st.title("보호자 실시간 안부 모니터링")
         st.caption("사용자 화면에서 변경된 정보가 실시간으로 동기화됩니다.")
