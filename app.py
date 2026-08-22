@@ -96,9 +96,11 @@ if "safety_status" not in st.session_state:
     st.session_state.safety_status = "외출 대기"
 if "safety_log" not in st.session_state:
     st.session_state.safety_log = []
+if "check_requested" not in st.session_state:
+    st.session_state.check_requested = False  # 보호자의 안부 확인 요청 상태 플래그
 
 # -------------------------------------------------------------
-# 4. 규칙 기반 위험도 알고리즘 (가변 계산식 적용)
+# 4. 규칙 기반 위험도 알고리즘
 # -------------------------------------------------------------
 def calculate_heat_risk(user_type, out_time_hour, duration_min, temp=35, humidity=75):
     base_score = 20
@@ -143,6 +145,11 @@ with st.sidebar:
     st.title("더위쉼표 (HEATWAY)")
     app_mode = st.radio("모드 선택", ["사용자: 외출 도우미", "보호자: 실시간 안부 대시보드"])
 
+# 한국 표준시(KST) 시간 생성 함수
+def get_kst_now_str():
+    kst_now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
+    return kst_now.strftime('%H:%M')
+
 # -------------------------------------------------------------
 # 6. 사용자 화면: 외출 도우미
 # -------------------------------------------------------------
@@ -155,6 +162,21 @@ if app_mode == "사용자: 외출 도우미":
         st.title("더위쉼표 맞춤 외출 플래너")
         st.caption("폭염 취약계층을 위한 실시간 위치기반 외출 안전 가이드")
     
+    # [핵심 추가] 보호자가 안부 요청을 보냈을 때 뜨는 실시간 팝업 안내창
+    if st.session_state.check_requested:
+        st.error("🚨 **[긴급 안부 요청]** 보호자가 대상자의 안전 상태를 확인하고 있습니다!")
+        pop_col1, pop_col2 = st.columns([2, 1])
+        with pop_col1:
+            st.warning("폭염 위험 시간대입니다. 건강에 이상이 없으시다면 아래 버튼을 눌러주세요.")
+        with pop_col2:
+            if st.button("👍 네, 안전해요 (안부 확인)", type="primary", use_container_width=True):
+                st.session_state.check_requested = False
+                now_str = get_kst_now_str()
+                st.session_state.safety_status = "안전 확인됨 (보호자 응답)"
+                st.session_state.safety_log.append(f"[{now_str}] 대상자가 보호자의 안부 요청에 '안전함'으로 응답 완료")
+                st.toast("보호자에게 안전 확인 응답이 전달되었습니다!")
+                st.rerun()
+
     col1, col2 = st.columns([1, 1])
     
     with col1:
@@ -269,10 +291,7 @@ if app_mode == "사용자: 외출 도우미":
     st.markdown("---")
     st.subheader("🛡️ 외출 상태 실시간 전송")
     c1, c2, c3 = st.columns(3)
-    
-    # 한국 표준시(KST, UTC+9)로 시간 보정
-    kst_now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
-    now_str = kst_now.strftime('%H:%M')
+    now_str = get_kst_now_str()
     
     with c1:
         if st.button("🚶 외출 시작 알림"):
@@ -328,7 +347,11 @@ else:
         c_emer1, c_emer2 = st.columns(2)
         with c_emer1:
             if st.button("📞 안부 확인 요청 발송"):
-                st.warning(f"[{st.session_state.user_type}] 대상자에게 안부 확인 요청을 발송했습니다.")
+                st.session_state.check_requested = True
+                now_str = get_kst_now_str()
+                st.session_state.safety_log.append(f"[{now_str}] 보호자가 대상자에게 긴급 안부 확인을 요청함")
+                st.warning(f"[{st.session_state.user_type}] 대상자에게 안부 확인 팝업 요청을 발송했습니다. (사용자 화면 상단에 알림 표출)")
+                st.rerun()
         with c_emer2:
             if st.button("⚠️ 긴급 연락망 호출"):
                 st.error(f"[{st.session_state.location_input}] 인근 복지관 및 비상연락처로 긴급 출동 요청을 전송했습니다.")
