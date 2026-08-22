@@ -4,13 +4,17 @@ import pandas as pd
 from streamlit_folium import st_folium
 import folium
 from geopy.geocoders import Nominatim
+import os
 
 # -------------------------------------------------------------
-# 1. 페이지 환경 설정
+# 1. 페이지 환경 설정 (브라우저 탭 아이콘에도 로고 적용)
 # -------------------------------------------------------------
+logo_path = "logo.png"
+page_icon_img = logo_path if os.path.exists(logo_path) else "☀️"
+
 st.set_page_config(
     page_title="HEATWAY - 전국 폭염 취약계층 안전 도우미",
-    page_icon="☀️",
+    page_icon=page_icon_img,
     layout="wide"
 )
 
@@ -88,38 +92,31 @@ if "safety_log" not in st.session_state:
     st.session_state.safety_log = []
 
 # -------------------------------------------------------------
-# 4. 규칙 기반 위험도 알고리즘 (수정: 시간대 및 활동시간 가변 반영)
+# 4. 규칙 기반 위험도 알고리즘
 # -------------------------------------------------------------
 def calculate_heat_risk(user_type, out_time_hour, duration_min, temp=35, humidity=75):
-    # 1) 기본 점수 (20점 시작)
     base_score = 20
     
-    # 2) 시간대별 위험도 가중치
     if 12 <= out_time_hour <= 16:
-        time_weight = 35   # 한낮 최고 위험
+        time_weight = 35
     elif 10 <= out_time_hour <= 18:
-        time_weight = 20   # 주간 활동 시간
+        time_weight = 20
     elif 19 <= out_time_hour <= 21:
-        time_weight = 5    # 초저녁
+        time_weight = 5
     else:
-        time_weight = -15  # 야간 및 이른 아침
+        time_weight = -15
         
-    # 3) 기온 & 습도 가중치 (한낮 외에는 영향 완화)
     weather_weight = 15 if (10 <= out_time_hour <= 18) else 5
     if humidity >= 70:
         weather_weight += 5
 
-    # 4) 활동 시간 가중치 (30분당 5점)
     duration_weight = int((duration_min / 30) * 5)
     
-    # 5) 취약계층 유형 가중치
     type_weights = {"고령자(독거)": 15, "야외근로자": 18, "어린이": 12, "일반인": 5}
     user_weight = type_weights.get(user_type, 8)
     
-    # 총점 계산 (10점 ~ 100점)
     total_score = min(100, max(10, base_score + time_weight + weather_weight + duration_weight + user_weight))
     
-    # 등급 분류
     if total_score >= 80:
         level = "위험 (외출 자제)"
     elif total_score >= 60:
@@ -132,24 +129,31 @@ def calculate_heat_risk(user_type, out_time_hour, duration_min, temp=35, humidit
     return total_score, level
 
 # -------------------------------------------------------------
-# 5. 사이드바 모드 전환
+# 5. 사이드바 (로고 이미지 추가)
 # -------------------------------------------------------------
-st.sidebar.title("☀️ HEATWAY")
-app_mode = st.sidebar.radio("모드 선택", ["사용자: 외출 도우미", "보호자: 실시간 안부 대시보드"])
+with st.sidebar:
+    if os.path.exists("logo.png"):
+        st.image("logo.png", width=120)
+    st.title("더위쉼표 (HEATWAY)")
+    app_mode = st.radio("모드 선택", ["사용자: 외출 도우미", "보호자: 실시간 안부 대시보드"])
 
 # -------------------------------------------------------------
 # 6. 사용자 화면: 외출 도우미
 # -------------------------------------------------------------
 if app_mode == "사용자: 외출 도우미":
-    st.title("🚶‍♂️ HEATWAY 맞춤 외출 안전 플래너")
-    st.write("전국 모든 지역을 검색하고, 선택한 쉼터의 위치를 지도에서 실시간으로 확인하세요.")
+    head_c1, head_c2 = st.columns([1, 8])
+    with head_c1:
+        if os.path.exists("logo.png"):
+            st.image("logo.png", width=75)
+    with head_c2:
+        st.title("더위쉼표 맞춤 외출 플래너")
+        st.caption("폭염 취약계층을 위한 실시간 위치기반 외출 안전 가이드")
     
     col1, col2 = st.columns([1, 1])
     
     with col1:
         st.subheader("1. 외출 정보 입력")
         
-        # 1) 전국 검색창 + 검색 버튼
         col_s1, col_s2 = st.columns([3, 1])
         with col_s1:
             search_query = st.text_input("현재 위치 검색 (시·군·구·읍·면)", value=st.session_state.location_input)
@@ -216,7 +220,7 @@ if app_mode == "사용자: 외출 도우미":
         st.session_state.selected_shelter = shelter_dict[chosen_name]
         target_shelter = st.session_state.selected_shelter
         
-        st.success(f"📍 **현재 선택된 쉼터:** `{target_shelter['name']}`  \n(거리: `{target_shelter['dist']}` | 에어컨: `{target_shelter['ac']}대` 가동 중)")
+        st.success(f"📍 **선택된 쉼터:** `{target_shelter['name']}`  \n(거리: `{target_shelter['dist']}` | 에어컨: `{target_shelter['ac']}대` 가동 중)")
             
         m = folium.Map(location=[target_shelter['lat'], target_shelter['lon']], zoom_start=15)
         
@@ -281,8 +285,13 @@ if app_mode == "사용자: 외출 도우미":
 # 7. 보호자 화면: 실시간 안부 대시보드
 # -------------------------------------------------------------
 else:
-    st.title("🛡️ 보호자 실시간 안부 모니터링")
-    st.caption("사용자 화면에서 변경된 전국 모든 주소, 위험도, 경유 쉼터가 실시간으로 동기화됩니다.")
+    head_c1, head_c2 = st.columns([1, 8])
+    with head_c1:
+        if os.path.exists("logo.png"):
+            st.image("logo.png", width=75)
+    with head_c2:
+        st.title("보호자 실시간 안부 모니터링")
+        st.caption("사용자 화면에서 변경된 정보가 실시간으로 동기화됩니다.")
     
     col_stat1, col_stat2, col_stat3 = st.columns(3)
     with col_stat1:
