@@ -29,7 +29,7 @@ st.set_page_config(
 # -------------------------------------------------------------
 @st.cache_data(show_spinner=False)
 def search_location_coords(query_text):
-    """전국 주소/지명을 위도, 경도로 실시간 변환"""
+    """전국 주소/지명을 위도, 경드로 실시간 변환"""
     try:
         geolocator = Nominatim(user_agent="heatway_service_app_2026")
         loc = geolocator.geocode(query_text + ", 대한민국" if "한국" not in query_text and "대한민국" not in query_text else query_text)
@@ -87,6 +87,37 @@ def generate_local_shelters(center_lat, center_lon, region_name):
         s["display_name"] = f"{s['name']} [{s['status_tag']}]"
 
     return shelter_candidates
+
+# -------------------------------------------------------------
+# 3. 전역 상태(Session State) 초기화 (누락되었던 세션 생성 로직)
+# -------------------------------------------------------------
+if "location_input" not in st.session_state:
+    st.session_state.location_input = "경남 진주시"
+if "current_lat" not in st.session_state:
+    st.session_state.current_lat = 35.1802
+if "current_lon" not in st.session_state:
+    st.session_state.current_lon = 128.1076
+if "user_type" not in st.session_state:
+    st.session_state.user_type = "고령자(독거)"
+if "out_time" not in st.session_state:
+    st.session_state.out_time = datetime.time(14, 0)
+if "duration" not in st.session_state:
+    st.session_state.duration = 70
+if "risk_score" not in st.session_state:
+    st.session_state.risk_score = 86
+if "risk_level" not in st.session_state:
+    st.session_state.risk_level = "위험 (외출 자제)"
+if "shelter_list" not in st.session_state:
+    st.session_state.shelter_list = generate_local_shelters(35.1802, 128.1076, "경남 진주시")
+if "selected_shelter" not in st.session_state:
+    st.session_state.selected_shelter = st.session_state.shelter_list[0]
+if "safety_status" not in st.session_state:
+    st.session_state.safety_status = "외출 대기"
+if "safety_log" not in st.session_state:
+    st.session_state.safety_log = []
+if "check_requested" not in st.session_state:
+    st.session_state.check_requested = False
+
 # -------------------------------------------------------------
 # 4. 규칙 기반 위험도 알고리즘
 # -------------------------------------------------------------
@@ -133,7 +164,6 @@ with st.sidebar:
     st.title("더위쉼표 (HEATWAY)")
     app_mode = st.radio("모드 선택", ["사용자: 외출 도우미", "보호자: 실시간 안부 대시보드"])
 
-# 한국 표준시(KST) 시간 생성 함수
 def get_kst_now_str():
     kst_now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
     return kst_now.strftime('%H:%M')
@@ -150,7 +180,7 @@ if app_mode == "사용자: 외출 도우미":
         st.title("더위쉼표 맞춤 외출 플래너")
         st.caption("폭염 취약계층을 위한 실시간 위치기반 외출 안전 가이드")
     
-    # [핵심 추가] 보호자가 안부 요청을 보냈을 때 뜨는 실시간 팝업 안내창
+    # 보호자가 안부 요청을 보냈을 때 뜨는 실시간 팝업 안내창
     if st.session_state.check_requested:
         st.error("🚨 **[긴급 안부 요청]** 보호자가 대상자의 안전 상태를 확인하고 있습니다!")
         pop_col1, pop_col2 = st.columns([2, 1])
@@ -236,7 +266,8 @@ if app_mode == "사용자: 외출 도우미":
         st.session_state.selected_shelter = shelter_dict[chosen_name]
         target_shelter = st.session_state.selected_shelter
         
-        st.success(f"📍 **선택된 쉼터:** `{target_shelter['name']}`  \n(거리: `{target_shelter['dist']}` | 에어컨: `{target_shelter['ac']}대` 가동 중)")
+        status_info = target_shelter.get('status_tag', '')
+        st.success(f"📍 **선택된 쉼터:** `{target_shelter['name']}` ({status_info})  \n(거리: `{target_shelter['dist']}` | 에어컨: `{target_shelter['ac']}대` 가동 중)")
             
         m = folium.Map(location=[target_shelter['lat'], target_shelter['lon']], zoom_start=15)
         
@@ -251,14 +282,14 @@ if app_mode == "사용자: 외출 도우미":
             if s["name"] == chosen_name:
                 folium.Marker(
                     [s['lat'], s['lon']],
-                    popup=f"★ 선택된 쉼터: {s['name']}\n(에어컨 {s['ac']}대)",
+                    popup=f"★ 선택된 쉼터: {s['name']}\n({s.get('status_tag', '')}, 에어컨 {s['ac']}대)",
                     tooltip=f"★ {s['name']} (선택됨)",
                     icon=folium.Icon(color="red", icon="star")
                 ).add_to(m)
             else:
                 folium.Marker(
                     [s['lat'], s['lon']],
-                    popup=f"{s['name']}\n(에어컨 {s['ac']}대)",
+                    popup=f"{s['name']}\n({s.get('status_tag', '')}, 에어컨 {s['ac']}대)",
                     tooltip=s['name'],
                     icon=folium.Icon(color="blue", icon="home")
                 ).add_to(m)
@@ -351,6 +382,7 @@ else:
         st.markdown(f"""
         - **기준 위치:** `{st.session_state.location_input}`
         - **이동 거리:** 동선 기준 약 `{shelter['dist']}`
+        - **운영 상태:** `{shelter.get('status_tag', '운영중')}`
         - **냉방 시설:** 에어컨 `{shelter['ac']}대` 가동 중
         - **보호자 안심 가이드:** 현재 폭염 위험도 **{st.session_state.risk_score}점** 상황입니다. 외출 후 30분 이내에 대상자가 `{shelter['name']}`에 도착했는지 확인하세요.
         """)
