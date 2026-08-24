@@ -40,16 +40,23 @@ def search_location_coords(query_text):
     return 35.1802, 128.1076, f"{query_text} (기본 위치)"
 
 def generate_local_shelters(center_lat, center_lon, region_name):
-    """해당 좌표 주변으로 쉼터 3곳을 자동 생성"""
+    """해당 좌표 주변 쉼터 생성 및 KST 현재 시각 기준 이용 가능 여부 실시간 판별"""
     clean_name = region_name.split(",")[0].strip()
-    return [
+    
+    # 한국 표준시(KST) 현재 시각 추출
+    kst_now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
+    current_hour = kst_now.hour
+
+    shelter_candidates = [
         {
             "name": f"{clean_name} 제1경로당 쉼터",
             "lat": center_lat + 0.0025,
             "lon": center_lon + 0.0020,
             "dist": "280m",
             "cap": 30,
-            "ac": 2
+            "ac": 2,
+            "open_h": 9,
+            "close_h": 18
         },
         {
             "name": f"{clean_name} 행정복지센터 안심쉼터",
@@ -57,7 +64,9 @@ def generate_local_shelters(center_lat, center_lon, region_name):
             "lon": center_lon - 0.0025,
             "dist": "520m",
             "cap": 60,
-            "ac": 4
+            "ac": 4,
+            "open_h": 9,
+            "close_h": 21  # 야간 연장 쉼터
         },
         {
             "name": f"{clean_name} 노인종합복지관",
@@ -65,40 +74,19 @@ def generate_local_shelters(center_lat, center_lon, region_name):
             "lon": center_lon - 0.0035,
             "dist": "750m",
             "cap": 100,
-            "ac": 6
+            "ac": 6,
+            "open_h": 9,
+            "close_h": 18
         }
     ]
 
-# -------------------------------------------------------------
-# 3. 전역 상태(Session State) 초기화
-# -------------------------------------------------------------
-if "location_input" not in st.session_state:
-    st.session_state.location_input = "경남 진주시"
-if "current_lat" not in st.session_state:
-    st.session_state.current_lat = 35.1802
-if "current_lon" not in st.session_state:
-    st.session_state.current_lon = 128.1076
-if "user_type" not in st.session_state:
-    st.session_state.user_type = "고령자(독거)"
-if "out_time" not in st.session_state:
-    st.session_state.out_time = datetime.time(14, 0)
-if "duration" not in st.session_state:
-    st.session_state.duration = 70
-if "risk_score" not in st.session_state:
-    st.session_state.risk_score = 86
-if "risk_level" not in st.session_state:
-    st.session_state.risk_level = "위험 (외출 자제)"
-if "shelter_list" not in st.session_state:
-    st.session_state.shelter_list = generate_local_shelters(35.1802, 128.1076, "경남 진주시")
-if "selected_shelter" not in st.session_state:
-    st.session_state.selected_shelter = st.session_state.shelter_list[0]
-if "safety_status" not in st.session_state:
-    st.session_state.safety_status = "외출 대기"
-if "safety_log" not in st.session_state:
-    st.session_state.safety_log = []
-if "check_requested" not in st.session_state:
-    st.session_state.check_requested = False  # 보호자의 안부 확인 요청 상태 플래그
+    # 현재 시각 기준 이용 가능(운영 중) 여부 자동 판별 필터링
+    for s in shelter_candidates:
+        s["is_open"] = (s["open_h"] <= current_hour < s["close_h"])
+        s["status_tag"] = "🟢 현재 이용가능 (운영중)" if s["is_open"] else "🔴 운영시간 종료"
+        s["display_name"] = f"{s['name']} [{s['status_tag']}]"
 
+    return shelter_candidates
 # -------------------------------------------------------------
 # 4. 규칙 기반 위험도 알고리즘
 # -------------------------------------------------------------
